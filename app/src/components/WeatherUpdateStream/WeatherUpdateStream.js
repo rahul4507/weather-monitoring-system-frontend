@@ -4,11 +4,12 @@ import Chart from "chart.js/auto";
 
 const WeatherUpdateStream = () => {
   const [data, setData] = useState({
-    labels: [], // Shared time labels for all cities
-    datasets: [], // Each city's dataset of temperatures
+    labels: [],
+    datasets: [],
   });
 
   const [cityData, setCityData] = useState({});
+  const cityColors = {}; // Store each city's color here
   const maxDataPoints = 10;
 
   const getRandomColor = () => {
@@ -23,39 +24,43 @@ const WeatherUpdateStream = () => {
   };
 
   const processWeatherUpdate = (weatherUpdates) => {
-    const newTime = new Date(weatherUpdates[0].created_at).toLocaleTimeString();
+    const newData = { ...cityData };
 
-    setData((prevData) => {
-      const updatedCityData = { ...cityData };
+    weatherUpdates.forEach((update) => {
+      const { city_name, temp, created_at } = update;
+      const timeLabel = new Date(created_at).toLocaleTimeString();
 
-      weatherUpdates.forEach((update) => {
-        const { city_name, temp } = update;
-
-        if (!updatedCityData[city_name]) {
-          updatedCityData[city_name] = {
-            label: city_name,
-            borderColor: getRandomColor(),
-            data: [],
-            fill: false,
-            tension: 0.1,
-          };
+      if (!newData[city_name]) {
+        // If the city is not yet in cityColors, assign a fixed color
+        if (!cityColors[city_name]) {
+          cityColors[city_name] = getRandomColor();
         }
 
-        updatedCityData[city_name].data = [
-          ...updatedCityData[city_name].data,
-          temp,
-        ].slice(-maxDataPoints);
-      });
+        newData[city_name] = {
+          label: city_name,
+          borderColor: cityColors[city_name],
+          backgroundColor: "transparent",
+          data: [],
+          fill: false,
+          tension: 0.1,
+        };
+      }
 
-      const updatedLabels = [...prevData.labels, newTime].slice(-maxDataPoints);
-      const updatedDatasets = Object.values(updatedCityData);
+      // Add temperature data and limit the data points
+      newData[city_name].data = [
+        ...newData[city_name].data,
+        { x: timeLabel, y: temp },
+      ].slice(-maxDataPoints);
+    });
 
-      setCityData(updatedCityData);
+    const allLabels = Object.values(newData)
+      .flatMap((city) => city.data.map((point) => point.x))
+      .slice(-maxDataPoints);
 
-      return {
-        labels: updatedLabels,
-        datasets: updatedDatasets,
-      };
+    setCityData(newData);
+    setData({
+      labels: [...new Set(allLabels)], // Unique, ordered labels
+      datasets: Object.values(newData),
     });
   };
 
@@ -68,10 +73,7 @@ const WeatherUpdateStream = () => {
       try {
         const parsedData = JSON.parse(event.data);
 
-        if (
-          parsedData.weather_updates &&
-          Array.isArray(parsedData.weather_updates)
-        ) {
+        if (Array.isArray(parsedData.weather_updates)) {
           processWeatherUpdate(parsedData.weather_updates);
         } else {
           console.error("Unexpected data format:", parsedData);
@@ -91,7 +93,7 @@ const WeatherUpdateStream = () => {
 
   return (
     <div className="weather-container container my-4">
-      <h2 className="text-center mb-4">🌍 Live Weather Updates by City</h2>
+      <h2 className="text-center mb-4">🌍 Live Weather Updates</h2>
       <Line
         data={data}
         options={{
@@ -101,16 +103,11 @@ const WeatherUpdateStream = () => {
           },
           scales: {
             x: {
-              title: {
-                display: true,
-                text: "Time",
-              },
+              type: "category",
+              title: { display: true, text: "Time" },
             },
             y: {
-              title: {
-                display: true,
-                text: "Temperature (°C)",
-              },
+              title: { display: true, text: "Temperature (°C)" },
             },
           },
         }}

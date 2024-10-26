@@ -55,7 +55,7 @@ const DailyWeatherData = () => {
 
   return (
     <div className="weather-container container my-4">
-      <h2 className="text-center mb-4">🌍 Live Weather Updates</h2>
+      <h2 className="text-center mb-4">🌍 Live Weather Summary</h2>
       <div className="row">
         {weatherData.map((weather, index) => (
           <div className="col-md-4 mb-4" key={index}>
